@@ -1906,8 +1906,10 @@ void RasterizerStorageRD::mesh_add_surface(RID p_mesh, const VS::SurfaceData &p_
 
 	for (int i = 0; i < p_surface.blend_shapes.size(); i++) {
 
-		ERR_FAIL_COND(p_surface.blend_shapes[i].size() != p_surface.vertex_data.size());
-
+		if (p_surface.blend_shapes[i].size() != p_surface.vertex_data.size()) {
+			memdelete(s);
+			ERR_FAIL_COND(p_surface.blend_shapes[i].size() != p_surface.vertex_data.size());
+		}
 		RID vertex_buffer = RD::get_singleton()->vertex_buffer_create(p_surface.blend_shapes[i].size(), p_surface.blend_shapes[i]);
 		s->blend_shapes.push_back(vertex_buffer);
 	}
@@ -4814,4 +4816,5 @@ RasterizerStorageRD::~RasterizerStorageRD() {
 	for (int i = 0; i < DEFAULT_RD_BUFFER_MAX; i++) {
 		RD::get_singleton()->free(mesh_default_rd_buffers[i]);
 	}
+	giprobe_sdf_shader.version_free(giprobe_sdf_shader_version);
 }

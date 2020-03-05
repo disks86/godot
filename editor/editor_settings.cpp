@@ -456,9 +456,11 @@ void EditorSettings::_load_defaults(Ref<ConfigFile> p_extra_config) {
 	_initial_set("text_editor/appearance/show_info_gutter", true);
 	_initial_set("text_editor/appearance/code_folding", true);
 	_initial_set("text_editor/appearance/word_wrap", false);
-	_initial_set("text_editor/appearance/show_line_length_guideline", true);
-	_initial_set("text_editor/appearance/line_length_guideline_column", 80);
-	hints["text_editor/appearance/line_length_guideline_column"] = PropertyInfo(Variant::INT, "text_editor/appearance/line_length_guideline_column", PROPERTY_HINT_RANGE, "20, 160, 1");
+	_initial_set("text_editor/appearance/show_line_length_guidelines", true);
+	_initial_set("text_editor/appearance/line_length_guideline_soft_column", 80);
+	hints["text_editor/appearance/line_length_guideline_soft_column"] = PropertyInfo(Variant::INT, "text_editor/appearance/line_length_guideline_soft_column", PROPERTY_HINT_RANGE, "20, 160, 1");
+	_initial_set("text_editor/appearance/line_length_guideline_hard_column", 100);
+	hints["text_editor/appearance/line_length_guideline_hard_column"] = PropertyInfo(Variant::INT, "text_editor/appearance/line_length_guideline_hard_column", PROPERTY_HINT_RANGE, "20, 160, 1");
 
 	// Script list
 	_initial_set("text_editor/script_list/show_members_overview", true);
@@ -1529,7 +1531,7 @@ Ref<ShortCut> ED_SHORTCUT(const String &p_path, const String &p_name, uint32_t p
 		ie.instance();
 
 		ie->set_unicode(p_keycode & KEY_CODE_MASK);
-		ie->set_scancode(p_keycode & KEY_CODE_MASK);
+		ie->set_keycode(p_keycode & KEY_CODE_MASK);
 		ie->set_shift(bool(p_keycode & KEY_MASK_SHIFT));
 		ie->set_alt(bool(p_keycode & KEY_MASK_ALT));
 		ie->set_control(bool(p_keycode & KEY_MASK_CTRL));

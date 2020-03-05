@@ -64,8 +64,21 @@ static const unsigned int MONTH_DAYS_TABLE[2][12] = {
 
 _ResourceLoader *_ResourceLoader::singleton = NULL;
 
-Ref<ResourceInteractiveLoader> _ResourceLoader::load_interactive(const String &p_path, const String &p_type_hint) {
-	return ResourceLoader::load_interactive(p_path, p_type_hint);
+Error _ResourceLoader::load_threaded_request(const String &p_path, const String &p_type_hint, bool p_use_sub_threads) {
+
+	return ResourceLoader::load_threaded_request(p_path, p_type_hint, p_use_sub_threads);
+}
+_ResourceLoader::ThreadLoadStatus _ResourceLoader::load_threaded_get_status(const String &p_path, Array r_progress) {
+	float progress = 0;
+	ResourceLoader::ThreadLoadStatus tls = ResourceLoader::load_threaded_get_status(p_path, &progress);
+	r_progress.resize(1);
+	r_progress[0] = progress;
+	return (ThreadLoadStatus)tls;
+}
+RES _ResourceLoader::load_threaded_get(const String &p_path) {
+	Error error;
+	RES res = ResourceLoader::load_threaded_get(p_path, &error);
+	return res;
 }
 
 RES _ResourceLoader::load(const String &p_path, const String &p_type_hint, bool p_no_cache) {
@@ -120,13 +133,21 @@ bool _ResourceLoader::exists(const String &p_path, const String &p_type_hint) {
 
 void _ResourceLoader::_bind_methods() {
 
-	ClassDB::bind_method(D_METHOD("load_interactive", "path", "type_hint"), &_ResourceLoader::load_interactive, DEFVAL(""));
+	ClassDB::bind_method(D_METHOD("load_threaded_request", "path", "type_hint", "use_sub_threads"), &_ResourceLoader::load_threaded_request, DEFVAL(""), DEFVAL(false));
+	ClassDB::bind_method(D_METHOD("load_threaded_get_status", "path", "progress"), &_ResourceLoader::load_threaded_get_status, DEFVAL(Array()));
+	ClassDB::bind_method(D_METHOD("load_threaded_get", "path"), &_ResourceLoader::load_threaded_get);
+
 	ClassDB::bind_method(D_METHOD("load", "path", "type_hint", "no_cache"), &_ResourceLoader::load, DEFVAL(""), DEFVAL(false));
 	ClassDB::bind_method(D_METHOD("get_recognized_extensions_for_type", "type"), &_ResourceLoader::get_recognized_extensions_for_type);
 	ClassDB::bind_method(D_METHOD("set_abort_on_missing_resources", "abort"), &_ResourceLoader::set_abort_on_missing_resources);
 	ClassDB::bind_method(D_METHOD("get_dependencies", "path"), &_ResourceLoader::get_dependencies);
 	ClassDB::bind_method(D_METHOD("has_cached", "path"), &_ResourceLoader::has_cached);
 	ClassDB::bind_method(D_METHOD("exists", "path", "type_hint"), &_ResourceLoader::exists, DEFVAL(""));
+
+	BIND_ENUM_CONSTANT(THREAD_LOAD_INVALID_RESOURCE);
+	BIND_ENUM_CONSTANT(THREAD_LOAD_IN_PROGRESS);
+	BIND_ENUM_CONSTANT(THREAD_LOAD_FAILED);
+	BIND_ENUM_CONSTANT(THREAD_LOAD_LOADED);
 }
 
 _ResourceLoader::_ResourceLoader() {
@@ -1113,15 +1134,17 @@ String _OS::get_system_dir(SystemDir p_dir) const {
 	return OS::get_singleton()->get_system_dir(OS::SystemDir(p_dir));
 }
 
-String _OS::get_scancode_string(uint32_t p_code) const {
+String _OS::get_keycode_string(uint32_t p_code) const {
 
 	return keycode_get_string(p_code);
 }
-bool _OS::is_scancode_unicode(uint32_t p_unicode) const {
+
+bool _OS::is_keycode_unicode(uint32_t p_unicode) const {
 
 	return keycode_has_unicode(p_unicode);
 }
-int _OS::find_scancode_from_string(const String &p_code) const {
+
+int _OS::find_keycode_from_string(const String &p_code) const {
 
 	return find_keycode(p_code);
 }
@@ -1312,9 +1335,9 @@ void _OS::_bind_methods() {
 	ClassDB::bind_method(D_METHOD("native_video_pause"), &_OS::native_video_pause);
 	ClassDB::bind_method(D_METHOD("native_video_unpause"), &_OS::native_video_unpause);
 
-	ClassDB::bind_method(D_METHOD("get_scancode_string", "code"), &_OS::get_scancode_string);
-	ClassDB::bind_method(D_METHOD("is_scancode_unicode", "code"), &_OS::is_scancode_unicode);
-	ClassDB::bind_method(D_METHOD("find_scancode_from_string", "string"), &_OS::find_scancode_from_string);
+	ClassDB::bind_method(D_METHOD("get_keycode_string", "code"), &_OS::get_keycode_string);
+	ClassDB::bind_method(D_METHOD("is_keycode_unicode", "code"), &_OS::is_keycode_unicode);
+	ClassDB::bind_method(D_METHOD("find_keycode_from_string", "string"), &_OS::find_keycode_from_string);
 
 	ClassDB::bind_method(D_METHOD("set_use_file_access_save_and_swap", "enabled"), &_OS::set_use_file_access_save_and_swap);
 
@@ -2321,10 +2344,10 @@ Error _Directory::change_dir(String p_dir) {
 	ERR_FAIL_COND_V_MSG(!d, ERR_UNCONFIGURED, "Directory must be opened before use.");
 	return d->change_dir(p_dir);
 }
-String _Directory::get_current_dir() {
+String _Directory::get_current_dir(bool p_include_drive) {
 
 	ERR_FAIL_COND_V_MSG(!d, "", "Directory must be opened before use.");
-	return d->get_current_dir();
+	return d->get_current_dir(p_include_drive);
 }
 Error _Directory::make_dir(String p_dir) {
 
@@ -2421,7 +2444,7 @@ void _Directory::_bind_methods() {
 	ClassDB::bind_method(D_METHOD("get_drive", "idx"), &_Directory::get_drive);
 	ClassDB::bind_method(D_METHOD("get_current_drive"), &_Directory::get_current_drive);
 	ClassDB::bind_method(D_METHOD("change_dir", "todir"), &_Directory::change_dir);
-	ClassDB::bind_method(D_METHOD("get_current_dir"), &_Directory::get_current_dir);
+	ClassDB::bind_method(D_METHOD("get_current_dir", "include_drive"), &_Directory::get_current_dir, DEFVAL(true));
 	ClassDB::bind_method(D_METHOD("make_dir", "path"), &_Directory::make_dir);
 	ClassDB::bind_method(D_METHOD("make_dir_recursive", "path"), &_Directory::make_dir_recursive);
 	ClassDB::bind_method(D_METHOD("file_exists", "path"), &_Directory::file_exists);
@@ -2583,17 +2606,17 @@ _Semaphore::~_Semaphore() {
 
 void _Mutex::lock() {
 
-	mutex->lock();
+	mutex.lock();
 }
 
 Error _Mutex::try_lock() {
 
-	return mutex->try_lock();
+	return mutex.try_lock();
 }
 
 void _Mutex::unlock() {
 
-	mutex->unlock();
+	mutex.unlock();
 }
 
 void _Mutex::_bind_methods() {
@@ -2601,16 +2624,6 @@ void _Mutex::_bind_methods() {
 	ClassDB::bind_method(D_METHOD("lock"), &_Mutex::lock);
 	ClassDB::bind_method(D_METHOD("try_lock"), &_Mutex::try_lock);
 	ClassDB::bind_method(D_METHOD("unlock"), &_Mutex::unlock);
-}
-
-_Mutex::_Mutex() {
-
-	mutex = Mutex::create();
-}
-
-_Mutex::~_Mutex() {
-
-	memdelete(mutex);
 }
 
 ///////////////

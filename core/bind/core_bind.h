@@ -49,8 +49,19 @@ protected:
 	static _ResourceLoader *singleton;
 
 public:
+	enum ThreadLoadStatus {
+		THREAD_LOAD_INVALID_RESOURCE,
+		THREAD_LOAD_IN_PROGRESS,
+		THREAD_LOAD_FAILED,
+		THREAD_LOAD_LOADED
+	};
+
 	static _ResourceLoader *get_singleton() { return singleton; }
-	Ref<ResourceInteractiveLoader> load_interactive(const String &p_path, const String &p_type_hint = "");
+
+	Error load_threaded_request(const String &p_path, const String &p_type_hint = "", bool p_use_sub_threads = false);
+	ThreadLoadStatus load_threaded_get_status(const String &p_path, Array r_progress = Array());
+	RES load_threaded_get(const String &p_path);
+
 	RES load(const String &p_path, const String &p_type_hint = "", bool p_no_cache = false);
 	Vector<String> get_recognized_extensions_for_type(const String &p_type);
 	void set_abort_on_missing_resources(bool p_abort);
@@ -60,6 +71,8 @@ public:
 
 	_ResourceLoader();
 };
+
+VARIANT_ENUM_CAST(_ResourceLoader::ThreadLoadStatus);
 
 class _ResourceSaver : public Object {
 	GDCLASS(_ResourceSaver, Object);
@@ -253,9 +266,9 @@ public:
 
 	String get_unique_id() const;
 
-	String get_scancode_string(uint32_t p_code) const;
-	bool is_scancode_unicode(uint32_t p_unicode) const;
-	int find_scancode_from_string(const String &p_code) const;
+	String get_keycode_string(uint32_t p_code) const;
+	bool is_keycode_unicode(uint32_t p_unicode) const;
+	int find_keycode_from_string(const String &p_code) const;
 
 	void set_use_file_access_save_and_swap(bool p_enable);
 
@@ -559,7 +572,7 @@ public:
 	int get_current_drive();
 
 	Error change_dir(String p_dir); // Can be relative or absolute, return false on success.
-	String get_current_dir(); // Return current dir location.
+	String get_current_dir(bool p_include_drive = true); // Return current dir location.
 
 	Error make_dir(String p_dir);
 	Error make_dir_recursive(String p_dir);
@@ -609,7 +622,7 @@ public:
 class _Mutex : public Reference {
 
 	GDCLASS(_Mutex, Reference);
-	Mutex *mutex;
+	Mutex mutex;
 
 	static void _bind_methods();
 
@@ -617,9 +630,6 @@ public:
 	void lock();
 	Error try_lock();
 	void unlock();
-
-	_Mutex();
-	~_Mutex();
 };
 
 class _Semaphore : public Reference {

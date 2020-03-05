@@ -47,7 +47,6 @@
 
 #include "drivers/windows/dir_access_windows.h"
 #include "drivers/windows/file_access_windows.h"
-#include "drivers/windows/mutex_windows.h"
 #include "drivers/windows/rw_lock_windows.h"
 #include "drivers/windows/semaphore_windows.h"
 #include "drivers/windows/thread_windows.h"
@@ -230,7 +229,6 @@ void OS_Windows::initialize_core() {
 
 	ThreadWindows::make_default();
 	SemaphoreWindows::make_default();
-	MutexWindows::make_default();
 	RWLockWindows::make_default();
 
 	FileAccess::make_default<FileAccessWindows>(FileAccess::ACCESS_RESOURCES);
@@ -1135,7 +1133,8 @@ void OS_Windows::process_key_events() {
 					k->set_control(ke.control);
 					k->set_metakey(ke.meta);
 					k->set_pressed(true);
-					k->set_scancode(KeyMappingWindows::get_keysym(ke.wParam));
+					k->set_keycode(KeyMappingWindows::get_keysym(ke.wParam));
+					k->set_physical_keycode(KeyMappingWindows::get_scansym((ke.lParam >> 16) & 0xFF, ke.lParam & (1 << 24)));
 					k->set_unicode(ke.wParam);
 					if (k->get_unicode() && gr_mem) {
 						k->set_alt(false);
@@ -1165,10 +1164,12 @@ void OS_Windows::process_key_events() {
 
 				if ((ke.lParam & (1 << 24)) && (ke.wParam == VK_RETURN)) {
 					// Special case for Numpad Enter key
-					k->set_scancode(KEY_KP_ENTER);
+					k->set_keycode(KEY_KP_ENTER);
 				} else {
-					k->set_scancode(KeyMappingWindows::get_keysym(ke.wParam));
+					k->set_keycode(KeyMappingWindows::get_keysym(ke.wParam));
 				}
+
+				k->set_physical_keycode(KeyMappingWindows::get_scansym((ke.lParam >> 16) & 0xFF, ke.lParam & (1 << 24)));
 
 				if (i + 1 < key_event_pos && key_event_buffer[i + 1].uMsg == WM_CHAR) {
 					k->set_unicode(key_event_buffer[i + 1].wParam);
@@ -2723,7 +2724,7 @@ Error OS_Windows::execute(const String &p_path, const List<String> &p_arguments,
 			if (p_pipe_mutex) {
 				p_pipe_mutex->lock();
 			}
-			(*r_pipe) += buf;
+			(*r_pipe) += String::utf8(buf);
 			if (p_pipe_mutex) {
 				p_pipe_mutex->unlock();
 			}
